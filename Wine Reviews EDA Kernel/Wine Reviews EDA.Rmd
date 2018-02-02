@@ -1,0 +1,435 @@
+---
+title: "Wine Reviews EDA"
+author: "Aashish Sharma"
+date: "January 22, 2018"
+output: 
+  html_document:
+    theme: cosmo
+    highlight: tango
+    code_folding: hide
+    number_sections: true
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(dev = 'pdf')
+knitr::opts_chunk$set(fig.align = 'center', fig.width = 9.5)
+```
+
+#Introduction
+
+This kernel performs Exploratory Data Analysis with the help of two very powerful tools R i.e dplyr and ggplot2. These libraries are an essential part of R as they are easy to learn and very helpful in data analysis and visualisation.
+
+Wine Reviews dataset contains reviews and descriptions of wines sold across the globe. This dataset consists of 10 attributes out of which 2 are numeric and others are characters. We'll know more about this dataset as we go further in this kernel. I have also added 2 new datasets for better visualisation in different plots. For some visualisations (mainly geographic plot) I have added a bunch of coordinates to pinpoint the location of the data. But for now let's begin with loading libraries and datasets into the memory."
+
+# Getting ready {.tabset .tabset-fade .tabset-pills}
+
+## Loading libraries
+
+We need a bunch of libraries to start with.
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(plotly)
+library(highcharter)
+
+```
+
+## Loading dataset
+
+Our original data with 2 new datasets
+
+```{r warning=FALSE, message=FALSE}
+wine1 <- read_csv('wine-reviews/winemag-data_first150k.csv')
+wine2 <- read_csv('wine-reviews/winemag-data-130k-v2.csv')
+country_code <- read_csv('https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv')[,c('name','alpha-3')]
+df <- read.csv("https://raw.githubusercontent.com/plotly/datasets/master/2011_us_ag_exports.csv")[,c(1,2)]
+```
+
+
+# Looking at the bigger picture
+
+Before we take a closer look at out dataset let's spend some time looking at the summary of the data with some plots.
+
+## Summary 
+
+Here we see that 2 out of 10 attributes are numeric and others are character vectors. I suggest that some of these attributes like country and province should be in factors for better visualization and analysis.
+
+```{r}
+summary(wine1)
+summary(wine2)
+
+str(wine1)
+str(wine2)
+
+```
+
+## Heads up
+
+Let's take a look at first few rows of the data which gives us an idea of the datasets values.
+
+```{r}
+head(wine1)
+head(wine2)
+
+```
+
+## Missing Values in the data
+
+Missing values are common in every datasets unless Kaggle removes them for competitions. So let's see the ratio of missing to actual data in out dataset. 
+
+```{r warning=FALSE}
+ as.data.frame(table(is.na(wine1))) %>% 
+  hchart('column', hcaes( y = Freq, group = as.factor(Var1))) %>% hc_add_theme(hc_theme_google()) %>%
+  hc_title(text = 'Missing Values in Data')
+```
+
+
+So through this plot we observe that there are about 320000 missing values in the data. As this is not a prediction competitions we're are not going to remove NA values. 
+
+
+
+# Preprocessing and Feature engineering
+
+This is an important step before analysis and visualisation because an untidy data can give us some crazy trends and outcomes.
+
+## Merging data
+
+Before proceeding further I feel that the two datasets should be combined so that we can analyse them both at the same time. We would leave 3 attributes (Taster Name, Taster Twitter Handle & title ) so that both of our datasets can be merged. We'll come to these attributes later. I would really appreciate your opinions on this move. 
+
+```{r}
+wine1 <- rbind(wine1, wine2[,-c(10:12)])
+```
+
+For some of our visualisations we require area codes of the locations given in the dataset. So I searched for some data over the internet to serve the purpose and came across these two datasets. One of them provides country codes and another provides state codes for United States of America.
+
+```{r}
+colnames(df)[2] <- 'Group.1' #naming the colunm for left_join
+wine1$country[wine1$country == 'US'] <- 'United States of America'
+colnames(country_code)[1] <- 'country'
+wine1 <- left_join(wine1, country_code, by = 'country')
+wine1$price_point <- wine1$price/wine1$points
+```
+
+
+
+# Visualisation
+
+This is the main and core topic of this kernel. In this topic we'll see our data with every angle to understand it fully and observe the underlying trends in the data. I have used plotly and ggplot2 to analyse and visualise the data. Feel free to give remarks and point out mistakes(if you find any).
+
+## Skewness in Numeric attributes
+
+Let's begin with visualising our 2 numeric attributes. We'll use boxplot because boxplot is an effective tool that shows us five point summary of an attribute or a variable.
+This plot have limited y axes due to huge outliers count. (Original plot below)
+
+```{r warning=FALSE,message=FALSE}
+ggplotly(ggplot(sample_n(wine1, 5000),aes(country, price, col = country)) + 
+           geom_boxplot()+ 
+           coord_cartesian(ylim = c(1,100))+ ggtitle('Prices in Different Countries')+
+           theme(legend.position="none",
+                 axis.text.x = element_text(angle = 90)))
+
+```
+
+```{r warning=FALSE,message=FALSE}
+ggplotly(ggplot(sample_n(wine1, 5000),aes(country, price, col = country)) + 
+           geom_boxplot()+ 
+           ggtitle('Prices in Different Countries (Outliers Included)')+
+           theme(legend.position="none",
+                 axis.text.x = element_text(angle = 90)))
+
+ggplotly(ggplot(sample_n(wine1, 5000),aes(country, points, col = country)) + 
+           geom_boxplot()+ 
+           ggtitle('Points in Different Countries')+
+           theme(legend.position="none",
+                 axis.text.x = element_text(angle = 90)))
+```
+
+
+## Who's got the money ?
+
+This section as the title suggest is all about prices. We'll see what is the average price of wine in different countries and provinces. Most of the plots which include countries are choropleth plots (geographic plots) which are visualised using plotly library. You'll get to see a bunch of statitics that might help you identify the places where you can get cheap wines.
+
+A look at the attribute through box plot.
+
+```{r warning=FALSE,message=FALSE}
+hcboxplot(x = sample_n(wine1,10000)$price) %>% hc_chart(type = 'column') %>%
+  hc_title(text = 'Box Plot of Price Attribute')
+
+```
+
+
+Price attribute in this dataset consists a huge no. of outliers as suggested by the above box plot as there are very few wines that are expensive and most wines have a price range of $5-$200.
+
+
+```{r warning=FALSE,message=FALSE}
+l <- list(color = toRGB("grey"), width = 0.5)
+
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'Mercator')
+)
+
+meanrm <- function(x){
+  mean(x, na.rm = TRUE)
+}
+temp <- aggregate(wine1$price, by = list(wine1$country, wine1$`alpha-3`), meanrm) 
+
+plot_geo(data = temp) %>% 
+  add_trace(z = ~x, color = ~x, text = ~Group.1, locations = ~Group.2,marker = list(line = l)
+  )%>% colorbar(title = 'Price of wine') %>%
+  layout(
+    geo = g,
+    title = 'Average Price of Wine in Different Countries'
+  )
+
+```
+
+```{r warning=FALSE ,message=FALSE}
+m <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = toRGB('white')
+)
+
+
+#for usa
+temp <- aggregate(wine1$price, by= list(wine1$province), meanrm) %>% inner_join(df, by = 'Group.1')
+
+plot_geo(data= temp,locationmode = 'USA-states') %>%
+    add_trace(
+      z =~x,text = ~Group.1, locations = ~code,
+      color = ~x) %>%
+    colorbar(title = 'Mean Price of wine') %>% 
+    layout(
+      geo = m,
+      title = 'Average Prices of Wine in USA'
+    )
+
+minrm <- function(x){
+  min(x, na.rm = TRUE)
+}
+
+maxrm <- function(x){
+  max(x, na.rm = TRUE)
+}
+
+temp <- aggregate(wine1$price, by = list(wine1$country), minrm) 
+temp2 <- NA
+for(i in 1:50)
+  temp2 <- rbind(temp2, filter(wine1, wine1$price == temp$x[i] & wine1$country == temp$Group.1[i]))
+
+temp2 <- unique(temp2[-1,c(2,6,7,8,12)])
+
+temp2 <- left_join(temp2, read_csv('cheaplocations.csv', col_names = c('province','Lat','Long')), by = 'province')
+
+temp2 %>% plot_geo(sizes = c(10,500)) %>% add_markers(x = ~Long, 
+                                     y = ~Lat, 
+                                     size = ~price, 
+                                     text = ~paste(temp2$province, "<br />",temp2$price),
+                                     color = ~price) %>% layout(
+                                     title = 'Cheap Wine Locations',
+                                     geo = list(showframe = FALSE,
+                                                            showland = TRUE,
+                                                            landcolor = toRGB("gray85")
+                                                            ))
+
+temp <- aggregate(wine1$price, by = list(wine1$country), maxrm) 
+temp2 <- NA
+for(i in 1:50)
+  temp2 <- rbind(temp2, filter(wine1, wine1$price == temp$x[i] & wine1$country == temp$Group.1[i]))
+
+temp2 <- unique(temp2[-1,c(2,6,7,8,12)])
+
+temp2 <- left_join(temp2, read_csv('expensivelocations.csv', col_names = c('province','Lat','Long')), by = 'province')
+
+temp2 %>% plot_geo(sizes = c(10,500)) %>% add_markers(x = ~Long, 
+                                     y = ~Lat, 
+                                     size = ~price, 
+                                     text = ~paste(temp2$province, "<br />",temp2$price),
+                                     color = ~price) %>% layout(
+                                     title = 'Expensive Wine Locations',
+                                     geo = list(showframe = FALSE,
+                                                            showland = TRUE,
+                                                            landcolor = toRGB("gray85")
+                                                            ))
+  
+  
+```
+
+Through these plots we observe that wines in Germany, France, Switzerland and USA are more expensive than other countries. In USA to my surprise only Nevada sells expensive wines. Critics found Peru, Egypt and China's wine were lower in quality than others.
+
+
+
+## Opinion matters
+
+This section is for other numeric attribute i.e points aka ratings. These ratings are the number of points WineEnthusiast rated the wine on a scale of 1-100. We'll see which country is the best in wine industry according to our critics. 
+
+Before we begin let's have a glance of this attribute through boxplot.
+
+```{ warning=FALSE,message=FALSE}
+hcboxplot(x = sample_n(wine1,10000)$points, color = 'red') %>% hc_chart(type = 'column') %>% hc_title(text = 'Box Plot of Points attribute')
+```
+
+Points feature have a range of 80-96 with a few outliers. These outliers seems legit as there will be few wines that might score above 96.
+
+```{r warning=FALSE,message=FALSE}
+temp <- aggregate(wine1$points, by = list(wine1$country, wine1$`alpha-3`), meanrm)
+plot_geo(temp) %>% 
+    add_trace(z = ~x, color = ~x, text = ~Group.1, locations = ~Group.2,marker = list(line = l), colors = "Blues"
+    )%>% colorbar(title = 'Rating of wine') %>%
+    layout(
+      geo = g,
+      title = "Best country to have wine according to critics"
+    ) 
+
+```
+
+
+```{r warning=FALSE,message=FALSE}
+temp <- aggregate(wine1$points, by= list(wine1$province), meanrm) %>%
+    inner_join(df, by = 'Group.1') %>% arrange(x)
+  highchart() %>% hc_add_series(name = "Rating", data = temp$x) %>% hc_xAxis(categories = temp$Group.1) %>%
+    hc_add_theme(hc_theme_monokai()) %>%
+    hc_title(text = 'Best Province by critics')
+  
+temp <- aggregate(wine1$points, by =list(wine1$country), max)
+temp1 <- NA
+for(i in 1:50)
+  temp1 <- rbind(temp1, filter(wine1, country == temp$Group.1[i] & points == temp$x[i]))
+temp1 <- unique(temp1[,-1])
+
+hchart(temp1, 'column',hcaes(x = country, y= points , color = designation)) %>%
+  hc_title(text = "Best Wine in the Country")
+  
+
+plot_ly(data = temp1, x = ~as.factor(country), y = ~points, color = ~as.factor(designation), type = 'bar' , colors = 'Set3', text = ~temp1$designation) %>%
+  layout(showlegend = FALSE, barmode = 'stack',
+         xaxis = list(title = 'Countries'),
+         yaxis = list(title = 'Rating'),
+         title = 'Wines with max rating in country ( Hover over bars )',
+         margin = list(b = 100))
+
+temp1 <- inner_join(temp1,read_csv('states.csv'), by = 'province')[-1,]
+plot_geo(data = temp1, sizes = c(1,300)) %>% 
+  add_markers(x = ~Longitude, 
+              y = ~Latitude,
+              size= ~points,
+              color = ~points, 
+              text = ~paste(temp1$province, '<br />', temp1$points),
+              locations = ~`alpha-3`) %>% layout(geo = list(showframe = FALSE,
+                                                            showland = TRUE,
+                                                            landcolor = toRGB("gray85")
+                                                            ),
+                                                 title= 'Provinces that offers best wines')
+```
+
+In USA most states offers best quality wines but Rhode Island tops in the list of reviewers. Washinton, Victoria, Bordeaux should on the bucket list of wine lovers as these locations offers maximum quality wines according to WineEnthusiast.
+
+
+## Are you getting best Value at high Price ?
+
+In this plot we look at price to value ratio. Most often hefty prices doesn't land you in great deal. For geographic plot I have computed Price/points through datasets. Less price 
+
+```{r warning=FALSE,message=FALSE}
+temp <- sample_n(wine1,5000)
+hchart(temp, 'scatter', hcaes(x = points, y = price)) %>% hc_title(text = 'Price Vs Rating')
+  
+temp <- aggregate(wine1$price_point, by = list(wine1$country, wine1$`alpha-3`), meanrm) 
+plot_geo(temp) %>% 
+    add_trace(z = ~x, color = ~x, text = ~Group.1, locations = ~Group.2,marker = list(line = l), colors = 'Reds'
+    )%>% colorbar(title = 'Price to Points ratio') %>%
+    layout(
+      geo = g,
+      title = 'Which country provide best value for money'
+    )
+```
+
+
+With the help of these plots we have follwing conclusions:
+
+1. Not all expensive are best. According to "Price vs Value" plot highly rated wines costs less.
+2. Switzerland is not the best place to get drunk
+3. India, China, Ukraine, Lithuania, Peru and Morocco offers bang for buck.
+
+## Variety of Wines
+
+Quality and Price of Wine is determined by the types of grapes used to make it. In this dataset we get tons of varieties to mess around. To visualise varieties we use the criteria of price and points ( because these are the only numeric attribute we possess).
+
+```{r warning=FALSE,message=FALSE}
+temp <-  wine1 %>% group_by(variety) %>% count() %>% 
+    arrange(desc(n)) %>% head(n = 20L) %>% arrange(n)
+ hchart(temp, 'column',hcaes(x = variety, y = n)) %>% hc_add_theme(hc_theme_flat()) %>%
+   hc_title(text = 'Best Variety According to manufactuerers')
+
+temp <-wine1 %>% group_by(variety) %>% count() %>% arrange(desc(n)) %>% 
+  tail(n = 20L) %>% arrange(n)
+ hchart(temp, 'column', hcaes(x = variety, y =n )) %>% hc_add_theme(hc_theme_gridlight()) %>%
+   hc_title(text = 'Worst Variety According to manufactuerers')
+
+
+```
+
+These were the top and worst varieties according the manufacturers ( occurences in dataset ). Let's see which varieties does our reivewers prefer.
+
+```{r warning=FALSE,message=FALSE}
+temp <- aggregate(wine1$points, by = list(wine1$variety), meanrm) %>%
+  arrange(desc(x)) %>% head(n = 15L) %>% arrange(x)
+hchart(temp, 'column' ,hcaes(x=x,y=Group.1)) %>% 
+  hc_title(text="Popular Wine Varieties according to critics") %>%
+  hc_add_theme(hc_theme_538())
+
+temp <- aggregate(wine1$price, by = list(wine1$variety), meanrm) %>%
+  arrange(desc(x)) %>% head(n = 15L)
+highchart() %>% hc_add_series(name = 'Price', temp$x) %>% hc_xAxis(categories = temp$Group.1) %>%
+  hc_add_theme(hc_theme_flat()) %>% hc_title(text = 'Most expensive Wines')
+
+```
+
+## Damn these Wineries are Good
+
+A winery is a building or property that produces wine, or a business involved in the production of wine, such as a wine company.Some wine companies own many wineries. Besides wine making equipment, larger wineries may also feature warehouses, bottling lines, laboratories, and large expanses of tanks known as tank farms. Wineries may have existed as long as 8,000 years ago. This dataset have some good wineries that need some great visualisation too.
+
+```{r warning=FALSE,message=FALSE}
+wine1 %>% group_by(winery) %>% count() %>% arrange(desc(n)) %>% head(25L) %>%
+  plot_ly(x = ~n , y = ~factor(winery, levels = winery[order(n)])) %>%
+  layout(xaxis = list(title ='Frequency'),
+         margin = list(l = 150),
+         title = 'Most Preferred Wineries accross the globe',
+         yaxis = list(title = 'Winery'))
+
+temp <- aggregate(wine1$points, by = list(wine1$winery), meanrm) %>% arrange(desc(x)) %>% head(20L)
+highchart() %>% hc_add_series(name = 'Rating',temp$x) %>% hc_xAxis(categories = temp$Group.1) %>%
+  hc_add_theme(hc_theme_flat()) %>% hc_title(text = 'Best Wineries by Reviewers')
+
+
+#best Winery in each country
+temp <- aggregate(wine1$points, by =list(wine1$country), max)
+temp1 <- NA
+for(i in 1:50)
+  temp1 <- rbind(temp1, filter(wine1, country == temp$Group.1[i] & points == temp$x[i]))
+temp1 <- unique(temp1[,-1])
+
+plot_geo(temp1) %>% 
+  add_trace(z = ~points, color = ~points, text = ~winery, locations = ~`alpha-3`) %>%
+  layout(geo = g, title = 'Best winery in different countries')
+```
+
+
+Wait, Is this finished ? No, its not. Coming up with new visulisations in next few days for the same dataset. Keep checking this dataset for the same.
+
+Peace.
+
+"
+
+
+
+
+
+
+
+
