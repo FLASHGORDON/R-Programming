@@ -1,0 +1,10 @@
+name: pollution_mapping
+title:
+username:
+account: elevate
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 311890
+bundleId: 1316965
+url: https://elevate.shinyapps.io/pollution_mapping/
+when: 1523612210.41827
